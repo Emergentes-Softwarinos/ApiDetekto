@@ -74,3 +74,21 @@ async def detectar_objeto(imagen: UploadFile = File(...)):
         filename=f"resultado_{imagen.filename}",
         media_type="image/jpeg",
     )
+
+
+@app.get("/ultima-imagen", response_class=FileResponse)
+def obtener_ultima_imagen():
+    cursor.execute("SELECT ruta_imagen FROM detecciones ORDER BY id DESC LIMIT 1")
+    resultado = cursor.fetchone()
+
+    if not resultado:
+        return {"error": "No hay imágenes registradas"}
+
+    ruta_imagen = resultado[0]
+
+    if not os.path.exists(ruta_imagen):
+        return {"error": "La imagen no se encuentra en el sistema"}
+
+    return FileResponse(
+        path=ruta_imagen, media_type="image/jpeg", filename="ultima_deteccion.jpg"
+    )
