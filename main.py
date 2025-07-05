@@ -1,5 +1,5 @@
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, File, UploadFile, Request
+from fastapi.responses import FileResponse, JSONResponse
 from ultralytics import YOLO
 import shutil
 import os
@@ -16,6 +16,44 @@ conn = mysql.connector.connect(
     port=3306,
 )
 cursor = conn.cursor()
+
+# Crear tabla detecciones si no existe
+cursor.execute(
+    """
+CREATE TABLE IF NOT EXISTS detecciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_archivo VARCHAR(255) NOT NULL,
+    clase_detectada VARCHAR(50),
+    ruta_imagen TEXT,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+"""
+)
+conn.commit()
+
+# Conexión 2 - martillos
+conn_martillos = mysql.connector.connect(
+    host="127.0.0.1",
+    user="root",
+    password="12345678",
+    database="ferreteria",
+    port=3306,
+)
+cursor_martillos = conn_martillos.cursor()
+
+# Crear tabla si no existe
+cursor_martillos.execute(
+    """
+CREATE TABLE IF NOT EXISTS martillos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    cantidad INT NOT NULL,
+    precio DECIMAL(10, 2) NOT NULL
+)
+"""
+)
+conn_martillos.commit()
+
 
 app = FastAPI(
     title="API de Detección de Objetos",
@@ -92,3 +130,49 @@ def obtener_ultima_imagen():
     return FileResponse(
         path=ruta_imagen, media_type="image/jpeg", filename="ultima_deteccion.jpg"
     )
+
+
+@app.get("/martillos")
+def obtener_martillos():
+    cursor_martillos.execute("SELECT nombre, cantidad, precio FROM martillos")
+    martillos = cursor_martillos.fetchall()
+    return JSONResponse(
+        [
+            {"nombre": nombre, "cantidad": cantidad, "precio": float(precio)}
+            for (nombre, cantidad, precio) in martillos
+        ]
+    )
+
+
+@app.get("/feed-imagenes")
+def obtener_urls_imagenes(request: Request):
+    cursor.execute("SELECT ruta_imagen FROM detecciones ORDER BY id DESC")
+    resultados = cursor.fetchall()
+
+    base_url = str(request.base_url).rstrip("/")  # Ej: http://127.0.0.1:8000
+    urls = []
+
+    for (ruta,) in resultados:
+        nombre_archivo = os.path.basename(ruta)
+        urls.append(f"{base_url}/imagen-feed/{nombre_archivo}")
+
+    return urls
+
+
+@app.get("/imagen-feed/{nombre}", response_class=FileResponse)
+def servir_imagen_feed(nombre: str):
+    ruta_imagen = f"imagenes_salida/{nombre}"
+
+    # Si la imagen fue generada dentro de una subcarpeta tipo predict_xxx
+    if not os.path.exists(ruta_imagen):
+        for carpeta in os.listdir("imagenes_salida"):
+            posible_ruta = os.path.join("imagenes_salida", carpeta, nombre)
+            if os.path.exists(posible_ruta):
+                ruta_imagen = posible_ruta
+                break
+        else:
+            return JSONResponse(
+                content={"error": "Imagen no encontrada"}, status_code=404
+            )
+
+    return FileResponse(path=ruta_imagen, media_type="image/jpeg", filename=nombre)
