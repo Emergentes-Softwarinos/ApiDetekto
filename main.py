@@ -9,11 +9,11 @@ from typing import Optional
 
 # Conexión a la base de datos
 conn = mysql.connector.connect(
-    host="127.0.0.1",
+    host="mainline.proxy.rlwy.net",
     user="root",
-    password="12345678",
-    database="detecciones_db",
-    port=3306,
+    password="FYffArrABIHbQZGhepeODICIyjFnxMzD",
+    database="railway",
+    port=52052,
 )
 cursor = conn.cursor()
 
@@ -33,11 +33,11 @@ conn.commit()
 
 # Conexión 2 - martillos
 conn_martillos = mysql.connector.connect(
-    host="127.0.0.1",
+    host="shinkansen.proxy.rlwy.net",
     user="root",
-    password="12345678",
-    database="ferreteria",
-    port=3306,
+    password="tKpYauIADsPJdjxAEniuqXLOfQBdiVUL",
+    database="railway",
+    port=54369,
 )
 cursor_martillos = conn_martillos.cursor()
 
